@@ -362,8 +362,6 @@ def plotPSD(text_file):
     
     PSD = (a_array - b_array) / a_array
     
-    #x1 = np.mean(a_array[100:-100]) * np.ones(np.size(c_array[100:-100])) #mV
-    
     plt.plot(a_array, PSD, 'bo')
     plt.show()
 
@@ -396,6 +394,21 @@ if __name__ == '__main__':
 
         with open(bin_file, "rb") as fid_bin:
             get_event_packets(fid_bin)
+
+    import contextlib
+
+    output_filename = "event_data_readable_output.txt"
+
+    with open(output_filename, 'w') as outfile:
+        with contextlib.redirect_stdout(outfile):
+            for bin_file in sorted(bin_files):
+                print(f"\nReading {os.path.basename(bin_file)}\n")
+                with open(bin_file, "rb") as fid_bin:
+                    get_event_packets(fid_bin)
+
+    print(f"\nAll files processed. Human-readable output saved to {output_filename}")
+
+    plotPSD(output_filename)
 
     print("\nAll files processed. Exiting...\n")
     exit()
