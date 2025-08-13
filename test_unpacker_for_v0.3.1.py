@@ -55,6 +55,7 @@ import serial
 
 import matplotlib.pyplot as plt
 from scipy import stats
+from scipy import optimize
 
 # So we can get environment variable info
 
@@ -63,6 +64,7 @@ import os
 #So we can process multiple .bin files simultaneously
 
 import glob
+import re
 
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -313,63 +315,57 @@ def get_event_packets(fid_bin):
 # PSD Plotting Utitlity
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import optimize
+def plotPSD(text_file):
 
-import re
-
-#PSD Plotting Script
-
-# Initialize lists to collect values
-a_vals, b_vals, c_vals, t_vals = [], [], [], []
-
-# Read file line by line
-with open('./merged.txt', 'r') as file:
-    for line in file:
-        line = line.strip()
-        
-        # Match the patterns using regex
-        if line.startswith('......... A ->'):
-            match = re.search(r'A -> (-?\d+)', line)
-            if match:
-                a_vals.append(int(match.group(1)))
-                
-        elif line.startswith('......... B ->'):
-            match = re.search(r'B -> (-?\d+)', line)
-            if match:
-                b_vals.append(int(match.group(1)))
-                
-        elif line.startswith('......... C ->'):
-            match = re.search(r'C -> (-?\d+)', line)
-            if match:
-                c_vals.append(int(match.group(1)))
-                
-        elif line.startswith('......... T ->'):
-            match = re.search(r'T -> (-?\d+)', line)
-            if match:
-                t_vals.append(int(match.group(1)))
-
-# Convert lists to NumPy arrays
-a_array = np.array(a_vals)
-b_array = np.array(b_vals)
-c_array = np.array(c_vals)
-t_array = np.array(t_vals)
-
-# Optional: print to verify
-print("A:", a_array)
-print("B:", b_array)
-print("C:", c_array)
-print("T:", t_array)
-
-#Calculating PSD and plotting:
-
-PSD = (a_array - b_array) / a_array
-
-#x1 = np.mean(a_array[100:-100]) * np.ones(np.size(c_array[100:-100])) #mV
-
-plt.plot(a_array, PSD, 'bo')
-plt.show()
+    # Initialize lists to collect values
+    a_vals, b_vals, c_vals, t_vals = [], [], [], []
+    
+    # Read file line by line
+    with open(text_file, 'r') as file:
+        for line in file:
+            line = line.strip()
+            
+            # Match the patterns using regex
+            if line.startswith('......... A ->'):
+                match = re.search(r'A -> (-?\d+)', line)
+                if match:
+                    a_vals.append(int(match.group(1)))
+                    
+            elif line.startswith('......... B ->'):
+                match = re.search(r'B -> (-?\d+)', line)
+                if match:
+                    b_vals.append(int(match.group(1)))
+                    
+            elif line.startswith('......... C ->'):
+                match = re.search(r'C -> (-?\d+)', line)
+                if match:
+                    c_vals.append(int(match.group(1)))
+                    
+            elif line.startswith('......... T ->'):
+                match = re.search(r'T -> (-?\d+)', line)
+                if match:
+                    t_vals.append(int(match.group(1)))
+    
+    # Convert lists to NumPy arrays
+    a_array = np.array(a_vals)
+    b_array = np.array(b_vals)
+    c_array = np.array(c_vals)
+    t_array = np.array(t_vals)
+    
+    # Optional: print to verify
+    print("A:", a_array)
+    print("B:", b_array)
+    print("C:", c_array)
+    print("T:", t_array)
+    
+    #Calculating PSD and plotting:
+    
+    PSD = (a_array - b_array) / a_array
+    
+    #x1 = np.mean(a_array[100:-100]) * np.ones(np.size(c_array[100:-100])) #mV
+    
+    plt.plot(a_array, PSD, 'bo')
+    plt.show()
 
 
 
