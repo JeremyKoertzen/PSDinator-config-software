@@ -363,6 +363,9 @@ def plotPSD(text_file):
     PSD = (a_array - b_array) / a_array
     
     plt.plot(a_array, PSD, 'bo')
+    plt.title("PSD vs. total integral")
+    plt.xlabel("Total integral (ADC Counts)")
+    plt.ylabel("PSD")
     plt.show()
 
 
