@@ -315,6 +315,8 @@ def get_event_packets(fid_bin):
 # PSD Plotting Utitlity
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+import seaborn as sns
+
 def plotPSD(text_file):
 
     # Initialize lists to collect values
@@ -361,8 +363,12 @@ def plotPSD(text_file):
     #Calculating PSD and plotting:
     
     PSD = (a_array - b_array) / a_array
+
+    heatmap, xedges, yedges = np.histogram2d(a_array, PSD, bins=100)
     
-    plt.plot(a_array, PSD, 'bo')
+    #plt.plot(a_array, PSD, 'bo')
+    plt.imshow(heatmap.T, origin='lower', cmap='plasma', extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
+    plt.colorbar(label='Counts')
     plt.title("PSD vs. total integral")
     plt.xlabel("Total integral (ADC Counts)")
     plt.ylabel("PSD")
