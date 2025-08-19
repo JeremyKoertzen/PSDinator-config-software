@@ -66,6 +66,10 @@ import os
 import glob
 import re
 
+#For importing .json files
+
+import json
+
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Create best fit line
@@ -310,13 +314,85 @@ def get_event_packets(fid_bin):
             cobs_packet_len = 0
     return
 
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# JSON file reader
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+def jsonReader(json_file):
+
+    #Making arrays for items we wish to import:
+
+    delay = []
+
+    # Open and load JSON data
+    with open(json_file, 'r') as file:
+        data = json.load(file)
+
+    
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # PSD Plotting Utitlity
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-def plotPSD(text_file):
+def plotPSD(a_array, b_array, c_array):
+    
+#NOTE: This code is written assuming the C window is the toal integral, while the A and B integrals of the tail with different
+#starting points. If your setup is different, change the letter numbers in the PSD definition accordingly. 
+
+    #Calculating PSD:
+    
+    PSD_a = (c_array - a_array) / c_array
+    PSD_b = (c_array - b_array) / c_array
+
+    #Filtering events:
+
+    threshold_upper = 1
+    threshold_lower = -1
+    threshold_left = -10000
+    threshold_right = 12000
+
+    #Masking unwanted values:
+
+    mask_a = (threshold_lower <= PSD_a) & (PSD_a <= threshold_upper) & (c_array <= threshold_right) & (c_array >= threshold_left)
+    mask_b = (threshold_lower <= PSD_b) & (PSD_b <= threshold_upper) & (c_array <= threshold_right) & (c_array >= threshold_left)
+
+    #Applying the mask:
+
+    PSD_a_filtered = PSD_a[mask_a]
+    PSD_b_filtered = PSD_b[mask_b]
+    tot_int_filtered_a = c_array[mask_a]
+    tot_int_filtered_b = c_array[mask_b]
+
+    print('Filtered PSD_a mean: ', np.mean(PSD_a_filtered))
+    print('Filtered PSD_b mean: ', np.mean(PSD_b_filtered))
+
+    #Defining the subplots:
+
+    fig, (axs_a, axs_b) = plt.subplots(1, 2)
+
+    #Plotting the Heatmap:
+
+    fig0 = axs_a.hist2d(tot_int_filtered_a, PSD_a_filtered, bins=500, cmap='YlOrBr')
+    fig1 = axs_b.hist2d(tot_int_filtered_b, PSD_b_filtered, bins=500, cmap='YlOrBr')
+    fig.colorbar(fig1[3], label='Counts')
+    fig.suptitle("PSD vs. total integral")
+
+    axs_a.set_xlabel("Total integral (ADC Counts)")
+    axs_b.set_xlabel("Total integral (ADC Counts)")
+
+    axs_a.set_ylabel("PSD")
+    #axs_b.set_ylabel("PSD")
+
+    fig.tight_layout
+
+    plt.show()
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Making numpy arrays for A, B, and C
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+def ABC(text_file):
 
     # Initialize lists to collect values
     a_vals, b_vals, c_vals, t_vals = [], [], [], []
@@ -358,34 +434,17 @@ def plotPSD(text_file):
     print("B:", b_array)
     print("C:", c_array)
     print("T:", t_array)
+
+    return a_array, b_array, c_array
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Integral crossing Finder
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+def zeroCrossing(a_array, b_array, c_array):
     
-    #Calculating PSD:
-    
-    PSD = (c_array - b_array) / c_array
-
-    #Filtering events:
-
-    threshold_upper = 1.0
-    threshold_lower = 0.0
-    threshold_left = 0.0
-    threshold_right = 15000
-
-    mask = (threshold_lower <= PSD) & (PSD <= threshold_upper) & (c_array <= threshold_right) & (c_array >= threshold_left)
-
-    PSD_filtered = PSD[mask]
-    c_filtered = c_array[mask]
-
-    print('Filtered PSD mean: ', np.mean(PSD_filtered))
-
-    #Plotting the Heatmap:
-
-    plt.hist2d(c_filtered, PSD_filtered, bins=100, cmap='YlOrBr')
-    plt.colorbar(label='Counts')
-    plt.title("PSD vs. total integral")
-    plt.xlabel("Total integral (ADC Counts)")
-    plt.ylabel("PSD")
-    plt.show()
-
+    #Making the subplots
+    return()
 
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -427,9 +486,13 @@ if __name__ == '__main__':
                 with open(bin_file, "rb") as fid_bin:
                     get_event_packets(fid_bin)
 
-    print(f"\nAll files processed. Human-readable output saved to {output_filename}")
+    print(f"\nAll .bin files processed. Human-readable output saved to {output_filename}")
 
-    plotPSD(output_filename)
+    #Call Plotting Functions
+
+    a_array, b_array, c_array = ABC(output_filename)
+    plotPSD(a_array, b_array, c_array)
+
 
     print("\nAll files processed. Exiting...\n")
     exit()

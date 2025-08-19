@@ -362,14 +362,13 @@ def plotPSD(text_file):
     
     #Calculating PSD and plotting:
     
-    PSD = (c_array - b_array) / c_array
+    PSD = (a_array - b_array) / a_array
 
-    mask = np.isfinite(PSD)
-    PSD_filtered = PSD[mask]
-    tot_int_filtered = c_array[mask]
+    heatmap, xedges, yedges = np.histogram2d(a_array, PSD, bins=100)
     
-    plt.plot(a_array, PSD, 'bo')
-    plt.ylim(-1, 1)
+    #plt.plot(a_array, PSD, 'bo')
+    plt.imshow(heatmap.T, origin='lower', cmap='plasma', extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
+    plt.colorbar(label='Counts')
     plt.title("PSD vs. total integral")
     plt.xlabel("Total integral (ADC Counts)")
     plt.ylabel("PSD")
@@ -383,7 +382,7 @@ def plotPSD(text_file):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(dexription="Read all .bin files from a folder.")
+    parser = argparse.ArgumentParser(description="Read all .bin files from a folder.")
     parser.add_argument("folderPath", help="Path to the folder containing .bin files")
     args = parser.parse_args()
 
