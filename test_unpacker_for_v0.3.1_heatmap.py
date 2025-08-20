@@ -65,6 +65,7 @@ import os
 
 import glob
 import re
+import contextlib
 
 #For importing .json files
 
@@ -320,13 +321,18 @@ def get_event_packets(fid_bin):
 
 def jsonReader(json_file):
 
-    #Making arrays for items we wish to import:
-
-    delay = []
-
     # Open and load JSON data
     with open(json_file, 'r') as file:
         data = json.load(file)
+
+    # Extracting the values from the JSON data
+    delay_a = np.array(data['configuration']['0']['psd']['octal_dac_settings']['delay_voltages']['a'])
+    delay_b = np.array(data['configuration']['0']['psd']['octal_dac_settings']['delay_voltages']['b'])
+    delay_c = np.array(data['configuration']['0']['psd']['octal_dac_settings']['delay_voltages']['c'])
+
+    #print("Delay values from JSON file:", delay)
+
+    return(delay_a, delay_b, delay_c)
 
     
 
@@ -441,9 +447,23 @@ def ABC(text_file):
 # Integral crossing Finder
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-def zeroCrossing(a_array, b_array, c_array):
+def zeroCrossing(delay_a, delay_b, delay_c, mean_a, mean_b, mean_c):
     
     #Making the subplots
+
+    fig, (axs_a, axs_b, axs_c) = plt.subplots(1, 3)
+
+    #Plotting the data
+
+    axs_a.plot(delay_a, mean_a, 'ro', label='A')
+    axs_b.plot(delay_b, mean_b, 'go', label='B')
+    axs_c.plot(delay_c, mean_c, 'bo', label='C')
+    fig.suptitle("ADC values vs. delay")
+    axs_a.set_xlabel("Delay (V)")
+    axs_b.set_xlabel("Delay (V)")
+    axs_c.set_xlabel("Delay (V)")
+    axs_a.set_ylabel("ADC value")
+    plt.show()
     return()
 
 
@@ -469,13 +489,36 @@ if __name__ == '__main__':
         print("No .bin files found in the folder.")
         exit(1)
 
+    # Finding means of the A, B, and C arrays
+
+    mean_a_list, mean_b_list, mean_c_list = [], [], []
+
     for bin_file in sorted(bin_files):
         print(f"\nReading {os.path.basename(bin_file)}\n")
 
         with open(bin_file, "rb") as fid_bin:
             get_event_packets(fid_bin)
 
-    import contextlib
+        # Generate output filename for each bin file
+        output_filename = f"{os.path.splitext(os.path.basename(bin_file))[0]}_readable_output.txt"
+
+        # Write human-readable output for each bin file
+        with open(output_filename, 'w') as outfile:
+            with contextlib.redirect_stdout(outfile):
+                with open(bin_file, "rb") as fid_bin:
+                    get_event_packets(fid_bin)
+
+        # Extract arrays and calculate means
+        a_array, b_array, c_array = ABC(output_filename)
+        mean_a = np.mean(a_array)
+        mean_b = np.mean(b_array)
+        mean_c = np.mean(c_array)
+
+        mean_a_list.append(mean_a)
+        mean_b_list.append(mean_b)
+        mean_c_list.append(mean_c)
+
+        print(f"Means for {os.path.basename(bin_file)}: A={mean_a}, B={mean_b}, C={mean_c}")
 
     output_filename = "event_data_readable_output.txt"
 
@@ -488,10 +531,38 @@ if __name__ == '__main__':
 
     print(f"\nAll .bin files processed. Human-readable output saved to {output_filename}")
 
+    #Looping through each .json file in the folder
+
+    json_files = glob.glob(os.path.join(args.folderPath, '*.json'))
+
+    if not json_files:
+        print("No .json files found in the folder.")
+    else:
+        delay_list_a, delay_list_b, delay_list_c = [], [], []  # Initialize delay array
+
+        for json_file in sorted(json_files):
+            print(f"\nReading {os.path.basename(json_file)}\n")
+            delay_a, delay_b, delay_c = jsonReader(json_file)
+            delay_list_a.append(delay_a)
+            delay_list_b.append(delay_b)
+            delay_list_c.append(delay_c)
+
+        delay_a = np.array(delay_list_a)  # Convert to NumPy array after collecting
+        delay_b = np.array(delay_list_b)
+        delay_c = np.array(delay_list_c)
+
+        print("Delay array a: ", delay_a)
+        print("Delay array b: ", delay_b)
+        print("Delay array c: ", delay_c)
+
     #Call Plotting Functions
 
     a_array, b_array, c_array = ABC(output_filename)
     plotPSD(a_array, b_array, c_array)
+    mean_a = np.array(mean_a_list)
+    mean_b = np.array(mean_b_list)
+    mean_c = np.array(mean_c_list)
+    zeroCrossing(delay_a, delay_b, delay_c, mean_a, mean_b, mean_c)
 
 
     print("\nAll files processed. Exiting...\n")
