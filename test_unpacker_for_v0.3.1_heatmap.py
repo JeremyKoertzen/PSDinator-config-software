@@ -329,11 +329,73 @@ def jsonReader(json_file):
     delay_a = np.array(data['configuration']['0']['psd']['octal_dac_settings']['delay_voltages']['a'])
     delay_b = np.array(data['configuration']['0']['psd']['octal_dac_settings']['delay_voltages']['b'])
     delay_c = np.array(data['configuration']['0']['psd']['octal_dac_settings']['delay_voltages']['c'])
+    delay_input = np.array(data['configuration']['0']['delay']['1']['value'])
 
     #print("Delay values from JSON file:", delay)
 
-    return(delay_a, delay_b, delay_c)
+    #return(delay_a, delay_b, delay_c)
+    return(delay_input)
 
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Compton Edge Plotting Utility
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+def plotComptonEdge(c_array):
+
+    # Making bins and edges for the histogram
+
+    bins, edges = np.histogram(c_array, bins=1000)
+    bin_centers = 0.5 * (edges[:-1] + edges[1:])
+    bin_size = edges[1] - edges[0]
+
+    print(f"Leftmost bin center: {bin_centers[0]}, Rightmost bin center: {bin_centers[-1]}")
+
+    # Defining the Gaussian function for fitting
+
+    def gaussian(x, a, x0, sigma):
+        return a * np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
+    
+    # Defining the bounds for the fit
+
+    left_bound = int( (5000 - bin_centers[0])/ bin_size )
+    right_bound = int( (6000 - bin_centers[0]) / bin_size )
+
+    bin_centers_fit = bin_centers[left_bound:right_bound]
+    bins_fit = bins[left_bound:right_bound]
+
+    print(f"Fitting range: {bin_centers_fit[0]} to {bin_centers_fit[-1]}")
+
+    # Fitting the Gaussian to the histogram data
+    
+    p0 = [100, 5000, 1000]
+    par, cov = optimize.curve_fit(gaussian, bin_centers_fit, bins_fit, p0=p0, maxfev=50000)
+    a_fit, x0_fit, sigma_fit = par
+
+    print(f"Fitted parameters: a = {a_fit}, x0 = {x0_fit}, sigma = {sigma_fit}")
+
+    x = np.linspace(bin_centers_fit[0], bin_centers_fit[-1], 1000)
+    y_fit = gaussian(x, a_fit, x0_fit, sigma_fit)
+
+    # Calculating the Compton Edge
+
+    compton_edge = x0_fit + ( 2 / 3 ) * sigma_fit
+    print(f"Compton Edge: {compton_edge}")
+    x_compton = compton_edge * np.ones(1000)
+    y_compton = np.linspace(0, np.max(bins), 1000)
+
+    # Plotting the histogram
+
+    plt.plot(bin_centers, bins, color='blue', label='Total Integral Histogram')
+    plt.plot(x, y_fit, 'r--', label='Gaussian Fit')
+    plt.plot(x_compton, y_compton, 'g--', label=f'Compton Edge: {compton_edge:.2f} ADC Counts')
+
+    plt.xlabel('Total Integral (ADC Counts)')
+    plt.ylabel('Counts')
+    plt.title('Total Integral Histogram')
+    plt.legend()
+    plt.grid()
+    plt.show()
     
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -348,15 +410,15 @@ def plotPSD(a_array, b_array, c_array):
 
     #Calculating PSD:
     
-    PSD_a = (c_array - a_array) / c_array
-    PSD_b = (c_array - b_array) / c_array
+    PSD_a = (a_array) / c_array
+    PSD_b = (b_array) / c_array
 
     #Filtering events:
 
     threshold_upper = 1
     threshold_lower = -1
-    threshold_left = -10000
-    threshold_right = 12000
+    threshold_left = 200
+    threshold_right = 5000
 
     #Masking unwanted values:
 
@@ -389,6 +451,9 @@ def plotPSD(a_array, b_array, c_array):
 
     axs_a.set_ylabel("PSD")
     #axs_b.set_ylabel("PSD")
+
+    axs_a.set_title(r"$\frac{a}{c}$")
+    axs_b.set_title(r"$\frac{b}{c}$")
 
     fig.tight_layout
 
@@ -447,22 +512,29 @@ def ABC(text_file):
 # Integral crossing Finder
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-def zeroCrossing(delay_a, delay_b, delay_c, mean_a, mean_b, mean_c):
+def zeroCrossing(delay_input, mean_a, mean_b, mean_c):
     
     #Making the subplots
 
-    fig, (axs_a, axs_b, axs_c) = plt.subplots(1, 3)
+    fig, (axs_a, axs_b, axs_c) = plt.subplots(3, 1)
 
     #Plotting the data
 
-    axs_a.plot(delay_a, mean_a, 'ro', label='A')
-    axs_b.plot(delay_b, mean_b, 'go', label='B')
-    axs_c.plot(delay_c, mean_c, 'bo', label='C')
+    axs_a.plot(delay_input, mean_a, 'ro', label='A')
+    axs_b.plot(delay_input, mean_b, 'go', label='B')
+    axs_c.plot(delay_input, mean_c, 'bo', label='C')
+
     fig.suptitle("ADC values vs. delay")
-    axs_a.set_xlabel("Delay (V)")
-    axs_b.set_xlabel("Delay (V)")
-    axs_c.set_xlabel("Delay (V)")
+
+    axs_a.set_xlabel("Input Delay (ns)")
+    axs_b.set_xlabel("Input Delay (ns)")
+    axs_c.set_xlabel("Input Delay (ns)")
     axs_a.set_ylabel("ADC value")
+    axs_b.set_ylabel("ADC value")
+    axs_c.set_ylabel("ADC value")
+
+    fig.tight_layout
+
     plt.show()
     return()
 
@@ -538,31 +610,26 @@ if __name__ == '__main__':
     if not json_files:
         print("No .json files found in the folder.")
     else:
-        delay_list_a, delay_list_b, delay_list_c = [], [], []  # Initialize delay array
+        delay_input_list = []
 
         for json_file in sorted(json_files):
             print(f"\nReading {os.path.basename(json_file)}\n")
-            delay_a, delay_b, delay_c = jsonReader(json_file)
-            delay_list_a.append(delay_a)
-            delay_list_b.append(delay_b)
-            delay_list_c.append(delay_c)
+            delay_input_list.append(jsonReader(json_file))
 
-        delay_a = np.array(delay_list_a)  # Convert to NumPy array after collecting
-        delay_b = np.array(delay_list_b)
-        delay_c = np.array(delay_list_c)
+        delay_input = np.array(delay_input_list)
 
-        print("Delay array a: ", delay_a)
-        print("Delay array b: ", delay_b)
-        print("Delay array c: ", delay_c)
-
-    #Call Plotting Functions
+    # Function Call for PSD plot
 
     a_array, b_array, c_array = ABC(output_filename)
-    plotPSD(a_array, b_array, c_array)
-    mean_a = np.array(mean_a_list)
-    mean_b = np.array(mean_b_list)
-    mean_c = np.array(mean_c_list)
-    zeroCrossing(delay_a, delay_b, delay_c, mean_a, mean_b, mean_c)
+    #plotPSD(a_array, b_array, c_array)
+    plotComptonEdge(c_array)
+
+    # Function call for delay plot
+
+    #mean_a = np.array(mean_a_list)
+    #mean_b = np.array(mean_b_list)
+    #mean_c = np.array(mean_c_list)
+    #zeroCrossing(delay_input, mean_a, mean_b, mean_c)
 
 
     print("\nAll files processed. Exiting...\n")
