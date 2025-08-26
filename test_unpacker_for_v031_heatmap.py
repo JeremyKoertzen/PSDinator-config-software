@@ -395,6 +395,9 @@ def gaussFit(bin_centers, bins, bin_size, left, right, source):
     a_fit, x0_fit, sigma_fit = par
     a_err, x0_err, sigma_err = np.round(np.sqrt(np.diag(cov)), decimals=2)
 
+    print(f'x_0 fit = {x0_fit} ± {x0_err}')
+    print(f'sigma fit = {sigma_fit} ± {sigma_err}')
+
     print(f"Fitted parameters: a = {a_fit}, x0 = {x0_fit}, sigma = {sigma_fit}")
 
     x = np.linspace(bin_centers_fit[0], bin_centers_fit[-1], 1000)
@@ -579,6 +582,10 @@ def zeroCrossing(delay_input, mean_a, mean_b, mean_c):
     axs_b.set_ylabel("ADC value")
     axs_c.set_ylabel("ADC value")
 
+    axs_a.legend()
+    axs_b.legend()
+    axs_c.legend()
+
     fig.tight_layout
 
     plt.show()
@@ -673,9 +680,9 @@ if __name__ == '__main__':
 
     # Defining fit range (EDITH THIS FOR YOUR SOURCE)
 
-    left = 14070
-    right = 15000
-    source = "Na22"  # Change this to your source name
+    left = 8000
+    right = 10000
+    source = "Co60"  # Change this to your source name
 
     bin_centers, bins, bin_size = histogramBinning(c_array)
     x, y_fit, x_compton, y_compton, compton_edge, x0_err = gaussFit(bin_centers, bins, bin_size, left, right, source)
