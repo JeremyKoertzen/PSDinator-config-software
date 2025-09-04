@@ -393,7 +393,7 @@ def gaussFit(bin_centers, bins, bin_size, left, right, source):
     p0 = [amp_exp, mean_exp, sigma_exp]
     par, cov = optimize.curve_fit(gaussian, bin_centers_fit, bins_fit, p0=p0, maxfev=50000)
     a_fit, x0_fit, sigma_fit = par
-    a_err, x0_err, sigma_err = np.round(np.sqrt(np.diag(cov)), decimals=2)
+    a_err, x0_err, sigma_err = np.round(np.sqrt(np.diag(cov)))
 
     print(f'x_0 fit = {x0_fit} ± {x0_err}')
     print(f'sigma fit = {sigma_fit} ± {sigma_err}')
@@ -406,6 +406,7 @@ def gaussFit(bin_centers, bins, bin_size, left, right, source):
     # Calculating the Compton Edge
 
     compton_edge = x0_fit + ( 2 / 3 ) * np.abs(sigma_fit)
+    compton_edge = np.round(compton_edge, decimals=0)
     print(f"Compton Edge: {compton_edge}")
     x_compton = compton_edge * np.ones(1000)
     y_compton = np.linspace(0, np.max(bins), 1000)
@@ -426,7 +427,7 @@ def plotComptonEdge(bin_centers, bins, x, y_fit, x_compton, y_compton, compton_e
 
     plt.plot(bin_centers, bins, color='blue', label='Total Integral Histogram')
     plt.plot(x, y_fit, 'r--', label='Gaussian Fit')
-    plt.plot(x_compton, y_compton, 'g--', label=f'Compton Edge: {compton_edge:.2f} $\pm$ {x0_err} ADC Counts')
+    plt.plot(x_compton, y_compton, 'g--', label=f'Compton Edge: {compton_edge:.0f} $\pm$ {x0_err:.0f} ADC Counts')
 
     plt.xlabel('Total Integral (ADC output)')
     plt.ylabel('Counts')
@@ -441,22 +442,22 @@ def plotComptonEdge(bin_centers, bins, x, y_fit, x_compton, y_compton, compton_e
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-def plotPSD(a_array, b_array, c_array):
+def plotPSD(gain_setting, PMT_voltage, a_array, b_array, c_array):
     
 #NOTE: This code is written assuming the C window is the toal integral, while the A and B integrals of the tail with different
 #starting points. If your setup is different, change the letter numbers in the PSD definition accordingly. 
 
     #Calculating PSD:
     
-    PSD_a = (a_array) / c_array
-    PSD_b = (b_array) / c_array
+    PSD_a = (c_array - a_array) / c_array
+    PSD_b = (c_array - b_array) / c_array
 
     #Filtering events:
 
     threshold_upper = 1
-    threshold_lower = -1
-    threshold_left = 200
-    threshold_right = 5000
+    threshold_lower = -0
+    threshold_left = 1000
+    threshold_right = 20000
 
     #Masking unwanted values:
 
@@ -482,7 +483,7 @@ def plotPSD(a_array, b_array, c_array):
     fig0 = axs_a.hist2d(tot_int_filtered_a, PSD_a_filtered, bins=500, cmap='YlOrBr')
     fig1 = axs_b.hist2d(tot_int_filtered_b, PSD_b_filtered, bins=500, cmap='YlOrBr')
     fig.colorbar(fig1[3], label='Counts')
-    fig.suptitle("PSD vs. total integral")
+    fig.suptitle(f"PSD vs. total integral for gain {gain_setting} GUI setting; PMT voltage {PMT_voltage} V")
 
     axs_a.set_xlabel("Total integral (ADC Counts)")
     axs_b.set_xlabel("Total integral (ADC Counts)")
@@ -490,8 +491,8 @@ def plotPSD(a_array, b_array, c_array):
     axs_a.set_ylabel("PSD")
     #axs_b.set_ylabel("PSD")
 
-    axs_a.set_title(r"$\frac{a}{c}$")
-    axs_b.set_title(r"$\frac{b}{c}$")
+    axs_a.set_title(r"$\frac{c-a}{c}$")
+    axs_b.set_title(r"$\frac{c-b}{c}$")
 
     fig.tight_layout
 
@@ -544,7 +545,7 @@ def ABC(text_file):
     print("C:", c_array)
     print("T:", t_array)
 
-    return a_array, b_array, c_array
+    return a_array, b_array, c_array, t_array
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Histogram Peak Finder
@@ -634,7 +635,7 @@ if __name__ == '__main__':
                     get_event_packets(fid_bin)
 
         # Extract arrays and calculate means
-        a_array, b_array, c_array = ABC(output_filename)
+        a_array, b_array, c_array, t_array = ABC(output_filename)
         mean_a = np.mean(a_array)
         mean_b = np.mean(b_array)
         mean_c = np.mean(c_array)
@@ -671,22 +672,31 @@ if __name__ == '__main__':
 
         delay_input = np.array(delay_input_list)
 
+    # Important constant for plotting
+
+    gain_setting = 1000
+    PMT_voltage = 1200
+
     # Function Call for PSD plot
 
-    a_array, b_array, c_array = ABC(output_filename)
-    #plotPSD(a_array, b_array, c_array)
+    a_array, b_array, c_array, t_array = ABC(output_filename)
+    plotPSD(gain_setting, PMT_voltage, a_array, b_array, c_array)
 
     # Histogram Binning and Compton Edge Plotting
 
     # Defining fit range (EDITH THIS FOR YOUR SOURCE)
 
-    left = 8000
-    right = 10000
-    source = "Co60"  # Change this to your source name
+    # source = "Na22_small"  # Change this to your source name
 
-    bin_centers, bins, bin_size = histogramBinning(c_array)
-    x, y_fit, x_compton, y_compton, compton_edge, x0_err = gaussFit(bin_centers, bins, bin_size, left, right, source)
-    plotComptonEdge(bin_centers, bins, x, y_fit, x_compton, y_compton, compton_edge, x0_err, source)
+    # left_bounds = {'Cs137': 11110, 'Mn54': 14440, 'Na22_small': 7000, 'Na22_big': 21000, 'Co60': 21000, 'Am241': 880, 'Co57': 880}
+    # right_bounds = {'Cs137': 14630, 'Mn54': 18000, 'Na22_small': 10000, 'Na22_big': 23500, 'Co60': 25000, 'Am241': 1500, 'Co57': 1500}
+
+    # left = left_bounds[source]
+    # right = right_bounds[source]
+
+    # bin_centers, bins, bin_size = histogramBinning(c_array)
+    # x, y_fit, x_compton, y_compton, compton_edge, x0_err = gaussFit(bin_centers, bins, bin_size, left, right, source)
+    # plotComptonEdge(bin_centers, bins, x, y_fit, x_compton, y_compton, compton_edge, x0_err, source)
 
     # Function call for delay plot
 
@@ -694,6 +704,23 @@ if __name__ == '__main__':
     #mean_b = np.array(mean_b_list)
     #mean_c = np.array(mean_c_list)
     #zeroCrossing(delay_input, mean_a, mean_b, mean_c)
+
+    # Timing Histogram
+
+    # low = 10500
+    # high = 10700
+
+    # mask_t = (t_array >= low) & (t_array <= high)
+    # t_array = t_array[mask_t]
+
+    # bin_centers, bins, bin_size = histogramBinning(t_array)
+
+    # plt.plot(bin_centers, bins / 9.5, color='blue', label='Timing Histogram')
+    # #plt.xlim(10000, 11000)
+    # plt.ylabel('Counts per minute')
+    # plt.xlabel('Time (T) in ADC Counts')
+    # plt.title('Prompt Pulse Timing Histogram')
+    # plt.show()
 
 
     print("\nAll files processed. Exiting...\n")
